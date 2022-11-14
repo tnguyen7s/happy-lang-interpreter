@@ -1,0 +1,196 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Nov 12 21:23:35 2022
+
+@author: Tuyen
+"""
+
+<program> 	     ::= <main-fun> <fun-declist> 
+                    | <main-fun>
+
+<main-fun>	     ::= "main" "(" ")" <block>
+
+<fun-declist> 	 ::= <fun> <fun-declist'>	         		    
+<fun-declist'>   ::= <fun> <fun-declist'>  
+                    | <fun>       		    
+
+<fun> 		     ::= <id> "(" ")" <block>
+	                |<id> "(" <param-list> ")" <block>
+
+<param-list> 	 ::= <param-decl> "," <param-list>
+        		    | <param-decl> 
+
+<param-decl>	 ::= < type > <id>
+        		    | < type > "[]" <id>
+        		    | < type > "|_|" <id>
+
+< type >         ::= "NUMBER"
+            	    |"STRING"
+
+<block>  	     ::= "{" <var-stmt-list>"}"
+
+<var-stmt-list>  ::= <var-decl>
+        		    | <stmt> 
+	                | <var-decl> <var-stmt-list> 
+        		    | <stmt> <var- stmt-list> 
+
+<var-decl>	     ::= <type> <id>
+        		    |<type> "[" <expr> "]" <id> 
+           		    |<type> “|_|" <id> 
+
+<stmt> 		     ::= <assign>
+            		| <swap>
+            		| <branch>
+            		| <for-loop>
+               		| <expr>
+            		| <print>
+            		| <println>
+            		| <read>
+            		| <stack-push>
+            		| <stack-pop>
+
+<assign> 	     ::= <ref> ":=" <expr>
+
+<swap> 	         ::= <ref> ":=:" <ref>
+
+<branch> 	     ::= "if" <condition-list> <block> “else” <block>
+		
+<for-loop> 	     ::= "for" "(" <assign-list> ";" <condition-list> “;" <assign-list>")"<block>
+        		    |"for" "(" ";" <condition-list> ";" <assign-list>")" <block>
+	                
+<condition-list> ::= <condition> <condition-list'> 
+<condition-list'>::= "&&" <condition> <condition-list'>  
+                    |"||" <condition> <condition-list'>
+                    |""	               
+
+<condition> 	::= <expr> "=" <expr>
+        		    |<expr> "<>" <expr>
+        		    |<expr> "<" <expr>
+        		    |<expr> "<=" <expr>
+        		    |<expr> ">" <expr>
+        		    |<expr> ">=" <expr>
+        		    |”(“ <condition-list “)”
+
+<assign-list> 	::= <assign>
+        		   |<assign> "," <assign-list> 
+
+<stack-push>	::= < id > “.” “push” “(” <expr> “)”
+<stack-pop> 	::= < id > “.” “pop” “(” “)”
+
+<expr> 		    ::= <term> <expr'>
+<expr'>         ::= "+" <term> <expr'>
+                   |"-" <term> <expr'>
+                   |""
+		
+<term> 	        ::= <factor> <term'>
+<term'>         ::= "*" <factor> <term'>
+                   |"/" <factor> <term'>
+                   |""
+    		
+<factor> 	::= <exponent>
+    		  | <factor> "**" <factor>
+
+
+<exponent> 	    ::= "(" <expr> ")"
+            		| <ref>
+            		| <literal>
+            		| <call>
+            		| "len" "(" <id> ")"
+
+<print> 		::= "print" <arg-list>
+
+<println> 	    ::= "println" <arg-list>
+
+<arg-list> 	    ::= <expr>
+        		    |<expr> "," <arg-list>
+
+<read> 		    ::= "input" <string> ";" <ref-list>
+            		|"input" <ref-list>
+
+<ref-list>	    ::= <ref>
+        		   |<ref> "," <ref-list>
+
+<ref> 		    ::= <id>
+        	       | <id> "[" <expr> "]"
+
+<literal> 	    ::= <number>
+        		   |<string>
+
+<call> 		    ::= <id> "(" <arg-list> ")"
+                   |<id> "(" ")"
+
+<number> 	    ::= <integer> 
+        		   |<integer> "." <integer>
+
+< integer >     ::= < digit >
+                   |< integer > < digit >
+
+<string> 	    ::= "\"" <characters> "\""
+
+<characters> 	::= <character>
+        		   |<characters> <character>
+
+<id> 		    ::= <letter>
+            	   | "_"
+            	   | <id> <digit>
+                   | <id> <letter>
+                   
+                   
+                   
+Informally Stated (not in BNF)
+==============================
+< digit > Any digit 0-9
+< character > Any character, with normal escapes \n, \t, \', \"
+< letter> Any upper- or lower-case letter
+
+Comments begin with "#" and extend to the end of a line
+
+
+Lexer Grammar
+=============
+Token           Rule
+-----           ----
+MAIN            main
+IF              if
+ELSE            else
+FOR             for
+PUSH            push
+POP             pop
+LEN             len 
+PRINT           print
+PRINTLN         println
+INPUT           input
+NUMBER_TP       NUMBER 
+STRING_TP       STRING
+
+LPAREN          (
+RPAREN          )
+LBRACKET        [
+RBRACKET        ]
+LCURLY          {
+RCURLY          }
+COMMA           ,
+SEMICOLON       ;
+DOT             .
+PIPE            |
+ASSIGN          :=
+SWAP            :=:
+AND             &&
+OR              ||
+STACK           |_|
+EQ              =
+NE              <>
+LT              <
+LE              <=
+GT              >
+GE              >=
+PLUS            +
+MINUS           -
+TIMES           *
+DIVISION        /
+POWER           **
+
+
+IDENTIFIER      ([a-zA-Z]|_)[a-zA-Z0-9_]*
+STRING          one or many characters between "", interpret escape
+NUMBER          an integer or a float
