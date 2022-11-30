@@ -15,7 +15,172 @@ To write a parser:
 """
 from happylang_lexer import HappyLexer, Token, TokenDetail
 import sys
+from enum import Enum, auto
 
+class ParseType(Enum):
+    PROGRAM = auto()
+    FUN = auto()
+    BLOCK = auto() # multiple stmts
+    ATOMIC = auto()
+    ADD = auto()
+    SUB = auto()
+    MUL = auto()
+    DIV = auto()
+    POW = auto()
+    NEG = auto()
+    LEN = auto()
+    INDEXING = auto()
+    CALL = auto()
+    VAR = auto()
+    VAR_AR = auto()
+    VAR_STK = auto()
+    ASSIGN = auto()
+    SWAP = auto()
+    PUSH = auto()
+    POP = auto()
+    IF = auto()
+    IFELSE = auto()
+    AND = auto()
+    OR = auto()
+    EQ = auto()
+    NE = auto()
+    LT = auto()
+    LE = auto()
+    GT = auto()
+    GE = auto()
+    LOOP = auto()
+    PRINT = auto()
+    PRINTLN = auto()
+    INPUT = auto()
+
+    
+ariness = {
+            ParseType.ADD: 2,
+            ParseType.SUB: 2,
+            ParseType.MUL: 2,
+            ParseType.DIV: 2,
+            ParseType.AND: 2,
+            ParseType.OR: 2
+          }
+
+class ParseTree:
+    """
+    Tree of a parse type that will be evalutated by the happy lang interpreter\n
+    
+    Parameters
+    ----------
+    parse_type: The ParseType of the root of the tree
+    token_detail: TokenDetail
+    children: ParseTree[]
+    """
+    def __init__(self, parse_type=ParseType.PROGRAM, token_detail=None):
+        self.parse_type = parse_type
+        self.token_detail = token_detail
+        self.children = []
+
+        
+    def print_tree(self, level=0):
+        """
+        Print the tree horizonally 
+        right to left of an abnomal tree will be drawned from top to bottom,
+        the root of the tree is located at the middle row
+        """
+        m = int(len(self.children)/2)-1
+        
+        # right haft
+        for tree in self.children[-1:m:-1]:
+            tree.print_tree(level+2)
+            
+            
+        # the root
+        indentation = "  "*level
+        if self.parse_type==ParseType.ATOMIC:
+            print(indentation, self.token_detail.lexeme, sep='')
+        else:
+            print(indentation, self.parse_type.name, sep='')
+        
+        # left half
+        for tree in self.children[m::-1]:
+            tree.print_tree(level+2)
+    
+    def children_extend_left(self, parse_trees):
+        """
+        Extend at the front of children
+        
+        Parameters
+        ----------
+        parse_tree : ParseTree[]
+
+        Returns
+        -------
+        None.
+
+        """
+        self.children = parse_trees + self.children
+ 
+    def children_extend_right(self, parse_trees):
+        """
+        Extend at the back of children
+        
+        Parameters
+        ----------
+        parse_trees : ParseTree[]
+
+        Returns
+        -------
+        None.
+
+        """
+        self.children =  self.children + parse_trees
+        
+    def children_append_left(self, parse_tree):
+        """
+        Insert at the front of children
+
+        Parameters
+        ----------
+        parse_tree : ParseTree
+
+        Returns
+        -------
+        None.
+
+        """
+        self.children.insert(0, parse_tree)
+        
+    def children_append_right(self, parse_tree):
+        """
+        Insert at the back of children
+
+        Parameters
+        ----------
+        parse_tree : ParseTree
+
+        Returns
+        -------
+        None.
+
+        """
+        self.children.append(parse_tree)
+        
+    def insert_left_leaf(self, parse_tree):
+        """
+        insert into the left most of the tree
+
+        Parameters
+        ----------
+        parse_tree : ParseTree
+
+        Returns
+        -------
+        None.
+
+        """
+        if len(self.children) < ariness[self.parse_type]:
+            self.children.insert(0, parse_tree)
+        else:
+            self.children[0].insert_left_leaf(parse_tree)
+    
 class HappyParser:
     """
     Parser state will follow the lexer state.
@@ -31,9 +196,7 @@ class HappyParser:
         Advance/consume the next token
         """
         
-        self.__cur_token_detail = self.__lexer.next()
-
-    
+        self.__cur_token_detail = self.__lexer.next() 
 
     def __has(self, t):
         """
@@ -77,23 +240,32 @@ class HappyParser:
         
     def parse(self):
         self.__next()
-        self.__program()
+        return self.__program()
         
     def __program(self):
         """
         Pre: The next token has been consumed 
 
         """
+        tree = ParseTree(ParseType.PROGRAM)
         
-        self.__main_fun()
+        # main function will be evaluated last
+        tree.children_append_right(self.__main_fun())
+        
         
         while not self.__has(Token.EOF):
             self.__fun()
+            
+        return tree
             
     def __main_fun(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.BLOCK)
         """
         self.__must_be(Token.MAIN)
         self.__next()
@@ -101,7 +273,8 @@ class HappyParser:
         self.__next()
         self.__must_be(Token.RPAREN)
         self.__next()
-        self.__block()
+        
+        return self.__block()
         
     def __fun(self):
         """
@@ -179,82 +352,132 @@ class HappyParser:
     
     def __block(self):
         """
+        v
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.BLOCK)
         """
+        tree = ParseTree(ParseType.BLOCK)
+        
         self.__must_be(Token.LCURLY)
         self.__next()
-        self.__var_stmt_list()
+        
+        tree.children_extend_right(self.__var_stmt_list())
+        
         self.__must_be(Token.RCURLY)
         self.__next()
+        
+        return tree
         
     def __var_stmt_list(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree[]
         """
+        var_trees = []
+        stmt_trees = []
+        
         while not self.__has(Token.RCURLY):
             if self.__has(Token.NUMBER_TP) or self.__has(Token.STRING_TP):
-                self.__var_decl()
+                var_trees.append(self.__var_decl())
             else:
-                self.__stmt()
-                
+                stmt_trees.append(self.__stmt())
+        
+        return var_trees + stmt_trees
                 
     def __var_decl(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.VAR) | ParseTree(ParseType.ARRAY) | ParseTree(ParseType.STACK)
         """
-        if self.__has(Token.NUMBER_TP):
-            self.__next()
-            self.__var_decl2()
+        tree = None
+        if self.__has(Token.NUMBER_TP) or self.__has(Token.STRING_TP):
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             
-        elif self.__has(Token.STRING_TP):
             self.__next()
-            self.__var_decl2()
+            tree = self.__var_decl2()
+            tree.children_append_left(child)
+            
+            
+        return tree
             
     def __var_decl2(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.VAR) | ParseTree(ParseType.ARRAY) | ParseTree(ParseType.STACK)
         """
+        tree = None
+        
         if self.__has(Token.IDENTIFIER):
+            tree = ParseTree(ParseType.VAR)
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_right(child)
+            
             self.__next()
         elif self.__has(Token.LBRACKET):
             self.__next()
-            self.__expr()
+            child2 = self.__expr()
             self.__must_be(Token.RBRACKET)
+            
             self.__next()
             self.__must_be(Token.IDENTIFIER)
+            tree = ParseTree(ParseType.VAR_AR)
+            child1 = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_left(child1)
+            tree.children_append_right(child2)
+
             self.__next()
         elif self.__has(Token.STACK):
             self.__next()
             self.__must_be(Token.IDENTIFIER)
+            tree = ParseTree(ParseType.VAR_STK)
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_right(child)
+
             self.__next()
         else:
             self.__must_be(Token.IDENTIFIER)
         
-        
+        return tree
         
     def __stmt(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree
         """
         if self.__has(Token.IDENTIFIER):
-            self.__id_stmt()
-        elif self.__has(Token.IF):
-            self.__branch()
+            return self.__id_stmt()
+        if self.__has(Token.IF):
+            return self.__branch()
         elif self.__has(Token.FOR):
-            self.__for_loop()
+            return self.__for_loop()
         elif self.__has(Token.PRINT):
-            self.__print()
+            return self.__print()
         elif self.__has(Token.PRINTLN):
-            self.__println()
+            return self.__println()
         elif self.__has(Token.INPUT):
-            self.__input()
+            return self.__input()
         else:
-            self.__expr()
+            return self.__expr()
         
         
     def __id_stmt(self):
@@ -262,64 +485,111 @@ class HappyParser:
         Pre: The next token has been consumed and must be id
         Post: Consume the next token before leaving this function
         """
+        tree = None
+        
         self.__must_be(Token.IDENTIFIER)
-        self.__ref()
+        child1 = self.__ref()
         
         if self.__has(Token.ASSIGN):
             self.__next()
-            self.__expr()
+            
+            child2 = self.__expr()
+            tree = ParseTree(ParseType.ASSIGN)
+            tree.children_extend_right([child1, child2])
         elif self.__has(Token.SWAP):
             self.__next()
-            self.__ref()
+            
+            child2 = self.__ref()
+            tree = ParseTree(ParseType.SWAP)
+            tree.children_extend_right([child1, child2])
         elif self.__has(Token.DOT):
             self.__next()
-            self.__stack_op()
+            
+            tree = self.__stack_op()
+            tree.children_append_left(child1)
         else:
+            # incomplete implementation
             if self.__has(Token.LPAREN):
                 self.__next()
-                self.__call2()
+                
+                ref_leaf = child1
+                tree = ParseTree(ParseType.CALL)
+                tree.children_append_left(ref_leaf)
+                tree.children_extend_right(self.__call2())  
+                
             else:
                 self.__factor2()
                 self.__term2()
                 self.__expr2()
             
             
+        return tree
+            
+            
     def __ref(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.ATOMIC) or ParseTree(ParseType.INDEXING)
         """
         self.__must_be(Token.IDENTIFIER)
+        
+        ref = self.__lexer.get_tok()
+        tree = ParseTree(ParseType.ATOMIC, ref)
+        
         self.__next()
         
         if self.__has(Token.LBRACKET):
             self.__next()
-            self.__expr()
+            
+            ref_leaf = tree
+            loc_leaf = self.__expr()
+            tree = ParseTree(ParseType.INDEXING, ref)
+            tree.children_extend_right([ref_leaf, loc_leaf])
+            
             self.__must_be(Token.RBRACKET)
             self.__next()
-    
+        
+        return tree
         
     def __stack_op(self):
         """
         Pre: The next token has been consumed and must be push or pop
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.PUSH) or ParseTree(ParseType.POP)
         """
+        tree = None
+        
         if self.__has(Token.PUSH):
+            tree = ParseTree(ParseType.PUSH)
+            
             self.__next()
             self.__must_be(Token.LPAREN)
+            
             self.__next()
-            self.__expr()
+            child = self.__expr()
+            tree.children_append_right(child)
+            
             self.__must_be(Token.RPAREN)
         elif self.__has(Token.POP):
+            tree = ParseTree(ParseType.POP)
+            
             self.__next()
             self.__must_be(Token.LPAREN)
+            
             self.__next()
             self.__must_be(Token.RPAREN)
-        
         else:
-            self.__must_be(Token.PUSH)
+            self.__must_be(Token.POP)
             
         self.__next()
+        return tree
 
         
             
@@ -327,15 +597,29 @@ class HappyParser:
         """
         Pre: The next token has been consumed and must be if
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.IF)
         """
         self.__must_be(Token.IF)
+        tree = ParseTree(ParseType.IF)
+        
         self.__next()
-        self.__condition_list()
-        self.__block()
+        cond = self.__condition_list()
+        b1 = self.__block()
+        tree.children_append_left(cond)
+        tree.children_append_right(b1)
         
         if self.__has(Token.ELSE):
+            tree = ParseTree(ParseType.IFELSE)
+            
             self.__next()
-            self.__block()
+            b2 = self.__block()
+            tree.children_append_left(cond)
+            tree.children_extend_right([b1,b2])
+            
+        return tree
 
         
         
@@ -343,226 +627,505 @@ class HappyParser:
         """
         Pre: The next token has been consumed 
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.AND)
         """
-        self.__condition()
-        self.__condition_list2()
+        child = self.__condition()
+        
+        tree = self.__condition_list2()
+        
+        if tree:
+            tree.insert_left_leaf(child)
+        else: 
+            tree = child
+            
+        return tree
         
     def __condition_list2(self):
         """
         Pre: The next token has been consumed 
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------------
+        ParseTree(ParseType.AND)
         """
-        if self.__has(Token.AND):
+        tree = None
+        if self.__has(Token.AND) or self.__has(Token.OR):
+            tree = ParseTree(ParseType.AND) if self.__has(Token.AND) else ParseTree(ParseType.OR)
+            
             self.__next()
-            self.__condition()
-            self.__condition_list2()
-        elif self.__has(Token.OR):
-            self.__next()
-            self.__condition()
-            self.__condition_list2()
+            child = self.__condition()
+            tree.children_append_left(child)
+            
+            cond_list_root = self.__condition_list2()
+            if cond_list_root:
+                cond_list_root.insert_left_leaf(tree)
+                tree = cond_list_root
+            
+        return tree
             
         
     def __condition(self):
         """
         Pre: The next token has been consumed 
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------------
+        ParseTree(ParseType.EQ)
         """
+        tree = None
         if self.__has(Token.LPAREN):
             self.__next()
-            self.__condition_list()
+            tree = self.__condition_list()
             self.__must_be(Token.RPAREN)
             self.__next()
         else:
-            self.__expr()
-            self.__condition2()
+            child = self.__expr()
+            tree = self.__condition2()
+            
+            tree.children_append_left(child)
+            
+        return tree
             
     def __condition2(self):
+        """
+        
+        Returns
+        -------------
+        ParseTree(ParseType.EQ)
+        """
+        
+        tree = None
         if self.__has(Token.EQ) or self.__has(Token.NE) or self.__has(Token.LT) or self.__has(Token.LE) or self.__has(Token.GT) or self.__has(Token.GE):
+            if self.__has(Token.EQ):
+                tree = ParseTree(ParseType.EQ)
+            elif self.__has(Token.NE):
+                tree = ParseTree(ParseType.NE)
+            elif self.__has(Token.LT):
+                tree = ParseTree(ParseType.LT)
+            elif self.__has(Token.GT):
+                tree = ParseTree(ParseType.GT)
+            elif self.__has(Token.LE):
+                tree = ParseTree(ParseType.LE)
+            else:
+                tree = ParseTree(ParseType.GE)
+            
             self.__next()
-            self.__expr()
+            child = self.__expr()
+            tree.children_append_right(child)
             
         else:
             self.__must_be(Token.EQ)
+            
+        return tree
         
     def __for_loop(self):
         
         """
         Pre: The next token has been consumed and must be for
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------------
+        ParseTree(ParseType.LOOP)
         """
         self.__must_be(Token.FOR)
+        tree = ParseTree(ParseType.LOOP)
+        
         self.__next()
         self.__must_be(Token.LPAREN)
         self.__next()
         if not self.__has(Token.SEMICOLON):
-            self.__assign_list()
+            tree.children_extend_left(self.__assign_list())
+            
         self.__must_be(Token.SEMICOLON)
         self.__next()
-        self.__condition_list()
+        tree.children_append_right(self.__condition_list())
         self.__must_be(Token.SEMICOLON) 
         self.__next()
         if not self.__has(Token.RPAREN):
-            self.__assign_list()
+            tree.children_extend_right(self.__assign_list())
         self.__must_be(Token.RPAREN)
         self.__next()
-        self.__block()     
+        
+        tree.children_append_right(self.__block())
+        
+        return tree
         
     def __assign_list(self):
-       self.__assign()
+       """
+       Returns
+       -------------
+       ParseTree[]
+
+       """
+       trees = []
+       
+       trees.append(self.__assign())
         
        while self.__has(Token.COMMA):
            self.__next()
-           self.__assign()
+           trees.append(self.__assign())
+           
+       return trees
+           
            
     def __assign(self):
-       self.__ref()
-       self.__must_be(Token.ASSIGN)
-       self.__next()
-       self.__expr()
+        """
+        Returns
+        -------------
+        ParseTree
+
+        """
+        child1 = self.__ref()
+        
+        self.__must_be(Token.ASSIGN)
+        tree = ParseTree(ParseType.ASSIGN)
+        
+        self.__next()
+        child2 = self.__expr()
+        tree.children_extend_right([child1, child2])
+        
+        return tree
         
         
     def __expr(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.ADD) or ParseTree(ParseType.SUB)
         """
-        self.__term()
-        self.__expr2()
+        child = self.__term()
+        tree = self.__expr2()
+        
+        if tree:
+            tree.insert_left_leaf(child)
+        else:
+            tree = child
+        
+        return tree
         
     def __expr2(self):
-        if self.__has(Token.PLUS):
-            self.__next()
-            self.__term()
-            self.__expr2()
+        """
+        Returns
+        -------
+        ParseTree(ParseType.ADD) or ParseTree(ParseType.SUB)
+
+        """
+        tree = None
+        
+        if self.__has(Token.PLUS) or self.__has(Token.MINUS):
+            parse_type = ParseType.ADD if self.__has(Token.PLUS) else ParseType.SUB
+            tree = ParseTree(parse_type)
             
-        elif self.__has(Token.MINUS):
             self.__next()
-            self.__term()
-            self.__expr2()
+            child = self.__term()  
+            tree.children_append_right(child)
+
+            expr_root = self.__expr2()
+            
+            if expr_root:
+                expr_root.insert_left_leaf(tree)
+                tree = expr_root       
+            
+            
+        return tree
         
     def __term(self):
-        self.__factor()
-        self.__term2()
+        """
+        Returns
+        -------
+        ParseTree(ParseType.DIV) or ParseTree(ParseType.MUL)
+
+        """
+        child = self.__factor()
+        tree = self.__term2()
+        
+        if tree:
+            tree.insert_left_leaf(child)
+        else:
+            tree = child
+            
+        return tree
         
     def __term2(self):
-        if self.__has(Token.TIMES):
+        """
+        Returns
+        -------
+        ParseTree(ParseType.DIV) or ParseTree(ParseType.MUL)
+
+        """
+        tree = None
+        
+        if self.__has(Token.TIMES) or self.__has(Token.DIVISION):
+            parse_type = ParseType.MUL if self.__has(Token.TIMES) else ParseType.DIV
+            tree = ParseTree(parse_type)
+            
             self.__next()
-            self.__factor()
-            self.__term2()
-        elif self.__has(Token.DIVISION):
-            self.__next()
-            self.__factor()
-            self.__term2()
+            child = self.__factor()
+            tree.children_append_right(child)
+            
+            term_root = self.__term2()
+            if term_root:
+                term_root.insert_left_leaf(tree)
+                tree = term_root
+            
+        return tree
+
     
     def __factor(self):
-        if self.__has(Token.MINUS):        
+        neg=None
+        if self.__has(Token.MINUS): 
+            neg = ParseTree(ParseType.NEG)
             self.__next()
             
-        self.__exponent()
-        self.__factor2()
+        child = self.__exponent()
+        tree = self.__factor2()
+        if tree:
+            tree.children_append_left(child)
+        else:
+            tree = child
+            
+        if neg:
+            neg.children_append_left(tree)
+            tree = neg
+            
+        return tree
         
     def __factor2(self):
+        """
+        Returns
+        -------
+        ParseTree(ParseType.POW)
+
+        """
+        
+        tree = None
         if self.__has(Token.POWER):
+            tree = ParseTree(ParseType.POW)
+
             self.__next()
-            self.__factor()
-            
+            child = self.__factor()
+            tree.children_append_right(child)
+        
+        return tree
+        
     def __exponent(self):
+        """
+        Returns
+        -------
+        ParseTree(ParseType)
+
+        """
+        tree = None
         if self.__has(Token.LPAREN):
             self.__next()
-            self.__expr()
+            tree = self.__expr()
             self.__must_be(Token.RPAREN)
             self.__next()
         elif self.__has(Token.IDENTIFIER):
-            self.__ref_or_call()
+            tree = self.__ref_or_call_or_pop()
         elif self.__has(Token.NUMBER):
+            tree = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             self.__next()
         elif self.__has(Token.STRING):
+            tree = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             self.__next()
         elif self.__has(Token.LEN):
+            tree = ParseTree(ParseType.LEN)
+            
             self.__next()
             self.__must_be(Token.LPAREN)
+            
             self.__next()
             self.__must_be(Token.IDENTIFIER)
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_left(child)
+            
             self.__next()
             self.__must_be(Token.RPAREN)
             self.__next()
             
-    def __ref_or_call(self):
-        self.__must_be(Token.IDENTIFIER)
-        self.__next()
-        
-        print(self.__cur_token_detail)
+        return tree
+            
+    def __ref_or_call_or_pop(self):
+        """
+        Returns
+        -------
+        ParseTree
 
+        """
+        self.__must_be(Token.IDENTIFIER)
+        ref = self.__lexer.get_tok()
+        tree = ParseTree(ParseType.ATOMIC, ref)
+        
+        self.__next()
+    
         if self.__has(Token.LBRACKET):
             self.__next()
-            self.__expr()
+            
+            ref_leaf = tree
+            loc_leaf = self.__expr()
+            tree = ParseTree(ParseType.INDEXING)
+            tree.children_extend_right([ref_leaf, loc_leaf])
+            
             self.__must_be(Token.RBRACKET)
             self.__next()
         elif self.__has(Token.LPAREN):
             self.__next()
-            self.__call2()
+            
+            ref_leaf = tree
+            tree = ParseTree(ParseType.CALL)
+            tree.children_append_left(ref_leaf)
+            tree.children_extend_right(self.__call2())   
+        
+        elif self.__has(Token.DOT):
+            self.__next()
+            
+            self.__must_be(Token.POP)
+            ref_leaf = tree
+            tree = ParseTree(ParseType.POP)
+            tree.children_append_left(ref_leaf)
+            
+            self.__next()
+            self.__must_be(Token.LPAREN)
+            
+            self.__next()
+            self.__must_be(Token.RPAREN)
+            
+            self.__next()
+            
+            
+        return tree
+              
             
     def __call2(self):
+        """
+        Returns
+        -------
+        ParseTree[]
+
+        """
+        trees = []
         if self.__has(Token.RPAREN):
             self.__next()
         else:
-            self.__arg_list()
+            trees = self.__arg_list()
             self.__must_be(Token.RPAREN)
             self.__next()
+            
+        return trees
         
     def __input(self):
         """
         Pre: The next token has been consumed and must be for
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.INPUT)
         """
         self.__must_be(Token.INPUT)
+        tree = ParseTree(ParseType.INPUT)
+        
         self.__next()
-        self.__input2()
+        tree.children_extend_right(self.__input2())
+        
+        return tree
         
     def __input2(self):
+        """
+        Returns
+        -------
+        ParseTree []
+
+        """
+        trees = []
         if self.__has(Token.STRING):
+            trees.append(ParseTree(ParseType.ATOMIC, self.__lexer.get_tok()))
+            
             self.__next()
             self.__must_be(Token.SEMICOLON)
             self.__next()
        
-        self.__ref_list()
+        trees.extend(self.__ref_list())
+        
+        return trees
         
     def __ref_list(self):
-        self.__ref()
+        """
+        Returns
+        -------
+        ParseTree []
+
+        """
+        trees = []
+        
+        trees.append(self.__ref())
         
         while self.__has(Token.COMMA):
             self.__next()
-            self.__ref()
+            trees.append(self.__ref())
+            
+        return trees
         
         
     def __print(self):
         self.__must_be(Token.PRINT)
+        tree = ParseTree(ParseType.PRINT)
+        
         self.__next()
-        self.__arg_list()
+        tree.children_extend_right(self.__arg_list())
+        
+        return tree
         
     
     def __println(self):
         self.__must_be(Token.PRINTLN)
+        tree = ParseTree(ParseType.PRINTLN)
+        
         self.__next()
-        self.__arg_list()
+        tree.children_extend_right(self.__arg_list())
+        
+        return tree
         
     def __arg_list(self):
-        self.__expr()
+        """
+        Returns
+        -------
+        ParseTree[]
+
+        """
+        trees = []
+        trees.append(self.__expr())
         
         while self.__has(Token.COMMA):
             self.__next()
-            self.__expr()
+            trees.append(self.__expr())
+            
+        return trees
             
             
             
 # unit test 
 if __name__ == "__main__":
-    p = HappyParser()
-    p.parse()
-        
-    
-        
-        
+    if len(sys.argv) == 2:
+        f = open(sys.argv[1])
+        l = HappyLexer(f)
+    else:
+        l = HappyLexer()
+
+    p = HappyParser(l)
+    tree = p.parse()
+    tree.print_tree()
+
         
             
     

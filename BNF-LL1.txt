@@ -99,14 +99,15 @@ Created on Sun Nov 13 13:17:56 2022
                     | ""
 
 <exponent> 	    ::= LPAREN <expr> RPAREN
-            		| IDENTIFIER <ref-OR-call>
+            		| IDENTIFIER <ref-OR-call-OR-pop>
             		| NUMBER
             		| STRING
             		| LEN LPAREN IDENTIFIER RPAREN
             		
-<ref-or-call>   ::=  ""   
+<ref-or-call-or-pop>::=  ""   
                     |LBRACKET <expr> RBRACKET 
                     |LPAREN <call'>
+                    |DOT IDENTIFIER 
                     
 <call'>         ::= <arg-list> RPAREN
                     | RPAREN

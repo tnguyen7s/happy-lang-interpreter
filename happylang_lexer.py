@@ -328,7 +328,7 @@ class HappyLexer:
             cur_lex += self.__cur_char
             self.__consume()
             
-            self.__token_detail = TokenDetail(Token.STRING, lexeme = cur_lex, value=None, line=line, col=col)
+            self.__token_detail = TokenDetail(Token.STRING, lexeme = cur_lex, value=cur_lex, line=line, col=col)
             return True
         
         
