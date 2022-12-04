@@ -130,7 +130,6 @@ class HappyLexer:
 
         """
         self.__cur_char = self.__lex_file.read(1)
-        
         self.__col += 1
         
         if (self.__cur_char=='\n'):
@@ -148,6 +147,7 @@ class HappyLexer:
         None.
 
         """
+        """
         while self.__cur_char == '#' or self.__cur_char == ' ' or self.__cur_char=='\n':
             if self.__cur_char == '#':
                 while self.__cur_char != '\n':
@@ -158,6 +158,17 @@ class HappyLexer:
                     
             if (self.__cur_char == '\n'):
                 self.__consume()
+        """
+        while self.__cur_char.isspace() or self.__cur_char == '#':
+            if self.__cur_char == '#':
+                # consume the rest of the line
+                while self.__cur_char and self.__cur_char != '\n':
+                    self.__consume()
+
+            # consume all the whitespace
+            while self.__cur_char.isspace():
+                self.__consume()
+
                 
     def __create_tok(self, token, lexeme=None, value=None, line=None, col=None):
         """
@@ -328,7 +339,7 @@ class HappyLexer:
             cur_lex += self.__cur_char
             self.__consume()
             
-            self.__token_detail = TokenDetail(Token.STRING, lexeme = cur_lex, value=cur_lex, line=line, col=col)
+            self.__token_detail = TokenDetail(Token.STRING, lexeme = cur_lex[1:-1], value=cur_lex[1:-1], line=line, col=col)
             return True
         
         
@@ -403,7 +414,6 @@ class HappyLexer:
          """
          return self.__token_detail
     
-    
 if __name__ == '__main__':
     lex = HappyLexer()
     while lex.get_tok().token != Token.EOF:
@@ -411,6 +421,7 @@ if __name__ == '__main__':
         #lex.__consume()
         #print("Line %d Col %d: %s" % (lex.get_line(), lex.get_col(), lex.get_char()))
         print(lex.next())
+        
         
         
         

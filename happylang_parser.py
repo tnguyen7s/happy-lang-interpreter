@@ -19,7 +19,6 @@ from enum import Enum, auto
 
 class ParseType(Enum):
     PROGRAM = auto()
-    FUN = auto()
     BLOCK = auto() # multiple stmts
     ATOMIC = auto()
     ADD = auto()
@@ -32,8 +31,6 @@ class ParseType(Enum):
     INDEXING = auto()
     CALL = auto()
     VAR = auto()
-    VAR_AR = auto()
-    VAR_STK = auto()
     ASSIGN = auto()
     SWAP = auto()
     PUSH = auto()
@@ -52,6 +49,9 @@ class ParseType(Enum):
     PRINT = auto()
     PRINTLN = auto()
     INPUT = auto()
+    FUN = auto()
+    PARAM = auto()
+    MAIN = auto()
 
     
 ariness = {
@@ -63,6 +63,13 @@ ariness = {
             ParseType.OR: 2
           }
 
+class RefType(Enum):
+    FUN = auto()
+    PRIMITIVE = auto()
+    ARRAY = auto()
+    STACK = auto()
+    
+
 class ParseTree:
     """
     Tree of a parse type that will be evalutated by the happy lang interpreter\n
@@ -73,9 +80,10 @@ class ParseTree:
     token_detail: TokenDetail
     children: ParseTree[]
     """
-    def __init__(self, parse_type=ParseType.PROGRAM, token_detail=None):
+    def __init__(self, parse_type=ParseType.PROGRAM, token_detail=None, ref_type = None):
         self.parse_type = parse_type
         self.token_detail = token_detail
+        self.ref_type = ref_type
         self.children = []
 
         
@@ -94,8 +102,10 @@ class ParseTree:
             
         # the root
         indentation = "  "*level
-        if self.parse_type==ParseType.ATOMIC:
+        if self.parse_type in [ParseType.ATOMIC, ParseType.FUN]:
             print(indentation, self.token_detail.lexeme, sep='')
+        elif self.parse_type in [ParseType.VAR, ParseType.PARAM]:
+            print(indentation, self.ref_type.name, sep='')
         else:
             print(indentation, self.parse_type.name, sep='')
         
@@ -247,15 +257,14 @@ class HappyParser:
         Pre: The next token has been consumed 
 
         """
-        tree = ParseTree(ParseType.PROGRAM)
+        tree = ParseTree(ParseType.PROGRAM, self.__lexer.get_tok())
         
         # main function will be evaluated last
         tree.children_append_right(self.__main_fun())
         
-        
         while not self.__has(Token.EOF):
-            self.__fun()
-            
+            tree.children_append_right(self.__fun())
+        
         return tree
             
     def __main_fun(self):
@@ -265,41 +274,61 @@ class HappyParser:
         
         Returns
         -------
-        ParseTree(ParseType.BLOCK)
+        ParseTree(ParseType.FUN)
         """
         self.__must_be(Token.MAIN)
+        tree = ParseTree(ParseType.MAIN, self.__lexer.get_tok())
+        
         self.__next()
         self.__must_be(Token.LPAREN)
         self.__next()
         self.__must_be(Token.RPAREN)
         self.__next()
         
-        return self.__block()
+        
+        tree.children_append_right(self.__block())
+        return tree
         
     def __fun(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
-        """
+        
+        Returns
+        -------
+        ParseTree(ParseType.FUN)
+        """        
         self.__must_be(Token.IDENTIFIER)
+        tree = ParseTree(ParseType.FUN, self.__lexer.get_tok())
+        
         self.__next()
         self.__must_be(Token.LPAREN)
-        self.__next()
-        self.__fun2()
         
+        self.__next()
+        tree.children_extend_right(self.__fun2())
+        
+        return tree
     def __fun2(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        ParseTree []
         """
+        trees = []
+        
         if self.__has(Token.RPAREN):
             self.__next()
-            self.__block()
+            trees.append(self.__block())
+            
         else:
-            self.__param_list()
+            trees.extend(self.__param_list())
             self.__must_be(Token.RPAREN)
             self.__next()
-            self.__block()
+            trees.append(self.__block())
+
+            
+        return trees
         
      
     
@@ -307,48 +336,88 @@ class HappyParser:
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.PARAM) []
         """
-        self.__param_decl()
+        trees = []
+        trees.append(self.__param_decl())
         
         while (self.__has(Token.COMMA)):
             self.__next()
-            self.__param_decl()
+            trees.append(self.__param_decl())
+            
+        return trees
             
     def __param_decl(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.PARAM)
         """
+        tree = None
         if self.__has(Token.NUMBER_TP):
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            
             self.__next()
-            self.__param_decl2()
+            tree = self.__param_decl2()
+            tree.children_append_left(child)
         elif self.__has(Token.STRING_TP):
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            
             self.__next()
-            self.__param_decl2()
+            tree = self.__param_decl2()
+            tree.children_append_left(child)
         else:
             self.__must_be(Token.NUMBER_TP)
-        
-        
+            
+        return tree 
     def __param_decl2(self):
         """
         Pre: The next token has been consumed
         Post: Consume the next token before leaving this function
+        
+        Returns
+        -------
+        ParseTree(ParseType.PARAM)
         """
+        tree = ParseTree(ParseType.PARAM, self.__lexer.get_tok())
+        
         if self.__has(Token.IDENTIFIER):
+            tree.ref_type = RefType.PRIMITIVE
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_right(child)
+            
             self.__next()
         elif self.__has(Token.LBRACKET):
+            tree.ref_type = RefType.ARRAY
+            
             self.__next()
             self.__must_be(Token.RBRACKET)
+            
             self.__next()
             self.__must_be(Token.IDENTIFIER)
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_right(child)
+
             self.__next()
         elif self.__has(Token.STACK):
+            tree.ref_type = RefType.STACK
+            
             self.__next()
             self.__must_be(Token.IDENTIFIER)
+            child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
+            tree.children_append_right(child)
+            
             self.__next()
         else:
             self.__must_be(Token.IDENTIFIER)
-            
+        
+        return tree
     
     def __block(self):
         """
@@ -360,7 +429,7 @@ class HappyParser:
         -------
         ParseTree(ParseType.BLOCK)
         """
-        tree = ParseTree(ParseType.BLOCK)
+        tree = ParseTree(ParseType.BLOCK, self.__lexer.get_tok())
         
         self.__must_be(Token.LCURLY)
         self.__next()
@@ -381,16 +450,15 @@ class HappyParser:
         -------
         ParseTree[]
         """
-        var_trees = []
-        stmt_trees = []
+        trees = []
         
         while not self.__has(Token.RCURLY):
             if self.__has(Token.NUMBER_TP) or self.__has(Token.STRING_TP):
-                var_trees.append(self.__var_decl())
+                trees.append(self.__var_decl())
             else:
-                stmt_trees.append(self.__stmt())
+                trees.append(self.__stmt())
         
-        return var_trees + stmt_trees
+        return trees
                 
     def __var_decl(self):
         """
@@ -399,7 +467,7 @@ class HappyParser:
         
         Returns
         -------
-        ParseTree(ParseType.VAR) | ParseTree(ParseType.ARRAY) | ParseTree(ParseType.STACK)
+        ParseTree(ParseType.VAR) 
         """
         tree = None
         if self.__has(Token.NUMBER_TP) or self.__has(Token.STRING_TP):
@@ -419,33 +487,39 @@ class HappyParser:
         
         Returns
         -------
-        ParseTree(ParseType.VAR) | ParseTree(ParseType.ARRAY) | ParseTree(ParseType.STACK)
+        ParseTree(ParseType.VAR) 
         """
-        tree = None
+        tree = ParseTree(ParseType.VAR, self.__lexer.get_tok())
         
         if self.__has(Token.IDENTIFIER):
-            tree = ParseTree(ParseType.VAR)
+            tree.ref_type = RefType.PRIMITIVE 
+            
             child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             tree.children_append_right(child)
             
             self.__next()
         elif self.__has(Token.LBRACKET):
+            tree.ref_type = RefType.ARRAY
+            
             self.__next()
+            if self.__has(Token.RBRACKET):
+                self.__must_be(Token.NUMBER)
+                
             child2 = self.__expr()
             self.__must_be(Token.RBRACKET)
             
             self.__next()
             self.__must_be(Token.IDENTIFIER)
-            tree = ParseTree(ParseType.VAR_AR)
             child1 = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             tree.children_append_left(child1)
             tree.children_append_right(child2)
 
             self.__next()
         elif self.__has(Token.STACK):
+            tree.ref_type = RefType.STACK 
+            
             self.__next()
             self.__must_be(Token.IDENTIFIER)
-            tree = ParseTree(ParseType.VAR_STK)
             child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             tree.children_append_right(child)
 
@@ -491,16 +565,16 @@ class HappyParser:
         child1 = self.__ref()
         
         if self.__has(Token.ASSIGN):
+            tree = ParseTree(ParseType.ASSIGN, self.__lexer.get_tok())
             self.__next()
             
             child2 = self.__expr()
-            tree = ParseTree(ParseType.ASSIGN)
             tree.children_extend_right([child1, child2])
         elif self.__has(Token.SWAP):
+            tree = ParseTree(ParseType.SWAP, self.__lexer.get_tok())
             self.__next()
             
             child2 = self.__ref()
-            tree = ParseTree(ParseType.SWAP)
             tree.children_extend_right([child1, child2])
         elif self.__has(Token.DOT):
             self.__next()
@@ -513,7 +587,7 @@ class HappyParser:
                 self.__next()
                 
                 ref_leaf = child1
-                tree = ParseTree(ParseType.CALL)
+                tree = ParseTree(ParseType.CALL, self.__lexer.get_tok())
                 tree.children_append_left(ref_leaf)
                 tree.children_extend_right(self.__call2())  
                 
@@ -567,7 +641,7 @@ class HappyParser:
         tree = None
         
         if self.__has(Token.PUSH):
-            tree = ParseTree(ParseType.PUSH)
+            tree = ParseTree(ParseType.PUSH, self.__lexer.get_tok())
             
             self.__next()
             self.__must_be(Token.LPAREN)
@@ -578,7 +652,7 @@ class HappyParser:
             
             self.__must_be(Token.RPAREN)
         elif self.__has(Token.POP):
-            tree = ParseTree(ParseType.POP)
+            tree = ParseTree(ParseType.POP, self.__lexer.get_tok())
             
             self.__next()
             self.__must_be(Token.LPAREN)
@@ -603,7 +677,7 @@ class HappyParser:
         ParseTree(ParseType.IF)
         """
         self.__must_be(Token.IF)
-        tree = ParseTree(ParseType.IF)
+        tree = ParseTree(ParseType.IF, self.__lexer.get_tok())
         
         self.__next()
         cond = self.__condition_list()
@@ -612,7 +686,7 @@ class HappyParser:
         tree.children_append_right(b1)
         
         if self.__has(Token.ELSE):
-            tree = ParseTree(ParseType.IFELSE)
+            tree = ParseTree(ParseType.IFELSE, self.__lexer.get_tok())
             
             self.__next()
             b2 = self.__block()
@@ -654,7 +728,7 @@ class HappyParser:
         """
         tree = None
         if self.__has(Token.AND) or self.__has(Token.OR):
-            tree = ParseTree(ParseType.AND) if self.__has(Token.AND) else ParseTree(ParseType.OR)
+            tree = ParseTree(ParseType.AND, self.__lexer.get_tok()) if self.__has(Token.AND, ) else ParseTree(ParseType.OR, self.__lexer.get_tok())
             
             self.__next()
             child = self.__condition()
@@ -702,17 +776,17 @@ class HappyParser:
         tree = None
         if self.__has(Token.EQ) or self.__has(Token.NE) or self.__has(Token.LT) or self.__has(Token.LE) or self.__has(Token.GT) or self.__has(Token.GE):
             if self.__has(Token.EQ):
-                tree = ParseTree(ParseType.EQ)
+                tree = ParseTree(ParseType.EQ, self.__lexer.get_tok())
             elif self.__has(Token.NE):
-                tree = ParseTree(ParseType.NE)
+                tree = ParseTree(ParseType.NE, self.__lexer.get_tok())
             elif self.__has(Token.LT):
-                tree = ParseTree(ParseType.LT)
+                tree = ParseTree(ParseType.LT, self.__lexer.get_tok())
             elif self.__has(Token.GT):
-                tree = ParseTree(ParseType.GT)
+                tree = ParseTree(ParseType.GT, self.__lexer.get_tok())
             elif self.__has(Token.LE):
-                tree = ParseTree(ParseType.LE)
+                tree = ParseTree(ParseType.LE, self.__lexer.get_tok())
             else:
-                tree = ParseTree(ParseType.GE)
+                tree = ParseTree(ParseType.GE, self.__lexer.get_tok())
             
             self.__next()
             child = self.__expr()
@@ -734,7 +808,7 @@ class HappyParser:
         ParseTree(ParseType.LOOP)
         """
         self.__must_be(Token.FOR)
-        tree = ParseTree(ParseType.LOOP)
+        tree = ParseTree(ParseType.LOOP, self.__lexer.get_tok())
         
         self.__next()
         self.__must_be(Token.LPAREN)
@@ -784,7 +858,7 @@ class HappyParser:
         child1 = self.__ref()
         
         self.__must_be(Token.ASSIGN)
-        tree = ParseTree(ParseType.ASSIGN)
+        tree = ParseTree(ParseType.ASSIGN, self.__lexer.get_tok())
         
         self.__next()
         child2 = self.__expr()
@@ -823,7 +897,7 @@ class HappyParser:
         
         if self.__has(Token.PLUS) or self.__has(Token.MINUS):
             parse_type = ParseType.ADD if self.__has(Token.PLUS) else ParseType.SUB
-            tree = ParseTree(parse_type)
+            tree = ParseTree(parse_type, self.__lexer.get_tok())
             
             self.__next()
             child = self.__term()  
@@ -866,7 +940,7 @@ class HappyParser:
         
         if self.__has(Token.TIMES) or self.__has(Token.DIVISION):
             parse_type = ParseType.MUL if self.__has(Token.TIMES) else ParseType.DIV
-            tree = ParseTree(parse_type)
+            tree = ParseTree(parse_type, self.__lexer.get_tok())
             
             self.__next()
             child = self.__factor()
@@ -909,7 +983,7 @@ class HappyParser:
         
         tree = None
         if self.__has(Token.POWER):
-            tree = ParseTree(ParseType.POW)
+            tree = ParseTree(ParseType.POW, self.__lexer.get_tok())
 
             self.__next()
             child = self.__factor()
@@ -939,7 +1013,7 @@ class HappyParser:
             tree = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             self.__next()
         elif self.__has(Token.LEN):
-            tree = ParseTree(ParseType.LEN)
+            tree = ParseTree(ParseType.LEN, self.__lexer.get_tok())
             
             self.__next()
             self.__must_be(Token.LPAREN)
@@ -973,7 +1047,7 @@ class HappyParser:
             
             ref_leaf = tree
             loc_leaf = self.__expr()
-            tree = ParseTree(ParseType.INDEXING)
+            tree = ParseTree(ParseType.INDEXING, self.__lexer.get_tok())
             tree.children_extend_right([ref_leaf, loc_leaf])
             
             self.__must_be(Token.RBRACKET)
@@ -982,7 +1056,7 @@ class HappyParser:
             self.__next()
             
             ref_leaf = tree
-            tree = ParseTree(ParseType.CALL)
+            tree = ParseTree(ParseType.CALL, self.__lexer.get_tok())
             tree.children_append_left(ref_leaf)
             tree.children_extend_right(self.__call2())   
         
@@ -991,7 +1065,7 @@ class HappyParser:
             
             self.__must_be(Token.POP)
             ref_leaf = tree
-            tree = ParseTree(ParseType.POP)
+            tree = ParseTree(ParseType.POP, self.__lexer.get_tok())
             tree.children_append_left(ref_leaf)
             
             self.__next()
@@ -1033,7 +1107,7 @@ class HappyParser:
         ParseTree(ParseType.INPUT)
         """
         self.__must_be(Token.INPUT)
-        tree = ParseTree(ParseType.INPUT)
+        tree = ParseTree(ParseType.INPUT, self.__lexer.get_tok())
         
         self.__next()
         tree.children_extend_right(self.__input2())
@@ -1079,7 +1153,7 @@ class HappyParser:
         
     def __print(self):
         self.__must_be(Token.PRINT)
-        tree = ParseTree(ParseType.PRINT)
+        tree = ParseTree(ParseType.PRINT, self.__lexer.get_tok())
         
         self.__next()
         tree.children_extend_right(self.__arg_list())
@@ -1089,7 +1163,7 @@ class HappyParser:
     
     def __println(self):
         self.__must_be(Token.PRINTLN)
-        tree = ParseTree(ParseType.PRINTLN)
+        tree = ParseTree(ParseType.PRINTLN, self.__lexer.get_tok())
         
         self.__next()
         tree.children_extend_right(self.__arg_list())

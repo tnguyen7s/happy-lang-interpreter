@@ -1,36 +1,37 @@
 main ()
 {
-		NUMBER n
-		input "How many number? "; n	
-		NUMBER [n] array	
-		println "Enter n numbers?”
-		NUMBER i
-    		for (i := 0; i < n; i := i+1){
-       			input array[i] 
-    		}
+	NUMBER n
+	input "How many number? "; n	
+	
+	NUMBER [n] array	
+	println "Enter ", n," numbers?"
+	NUMBER i
+    for (i := 0; i < n; i := i+1){
+       	input array[i] 
+    }
         
-    		bubbleSort(array)
-    		println "Sorted: "
-    		for (i := 0; i < n; i := i+1){
-       			print array[i], " "
-    		}
-    	}
+	bubbleSort(array)
+    println "Sorted: "
+    for (i := 0; i < n; i := i+1){
+       	print array[i], " "
+    }
+	}
     
 bubbleSort (NUMBER [] array) 
 {
-    	NUMBER next 
-		NUMBER i
-		NUMBER j
+    NUMBER next 
+	NUMBER i
+	NUMBER j
 	
-    	for (i :=0, next := 1; i < len(array) && next=1; i := i+1)
+    for (i :=0, next := 1; i < len(array) && next=1; i := i+1)
+	{
+        for (j:=0, next:=0; j<len(array)-1; j:=j+1)
 		{
-        	for (j:=0, next:=0; j<len(array)-1; j:=j+1)
+            if array[j]>array[j+1]
 			{
-            	if array[j]>array[j+1]
-				{
-                   	next := 1
-                   	array[j] :=: array[j+1]
-            	}             
-        	}
-   		}
+                next := 1
+                array[j] :=: array[j+1]
+            }             
+        }
+   	}
 }

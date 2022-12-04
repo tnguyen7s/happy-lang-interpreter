@@ -1,0 +1,49 @@
+main ()
+{
+	NUMBER n
+	input "How many number? "; n
+	
+	NUMBER [n] array	
+	println "Enter ", n," numbers?"
+	
+	NUMBER i
+    for (i := 0; i < n; i := i+1){
+       	input array[i] 
+    }
+    
+	NUMBER low 
+	NUMBER high
+	low := 0
+	high := n - 1
+    quickSort(array, low, high)
+    
+	println "Sorted: "
+    for (i := 0; i < n; i := i+1){
+       	print array[i], " "
+    }
+ }
+
+quickSort(NUMBER [] arr, NUMBER low, NUMBER high) {
+	NUMBER pivot
+	NUMBER i
+	NUMBER j
+	NUMBER pi
+	
+    if (low < high) {
+        pivot := arr[high]
+        i := (low - 1)
+        for (j := low; j <= high - 1; j := j + 1) {
+            if (arr[j] <= pivot) {
+				i := i + 1
+                  
+                arr[i] :=: arr[j]
+            }
+        }
+
+        arr[i + 1] :=: arr[high]
+        pi := i + 1
+
+        quickSort(arr, low, pi - 1)
+        quickSort(arr, pi + 1, high)
+    }
+}

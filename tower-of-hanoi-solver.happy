@@ -12,8 +12,10 @@ main(){
         println i
 		source.push(i)
     }
-        
+    
+	println "Moving disks from source to target..."
     move(n, source, target, aux)
+	
     println "Disks in the target: "
     for (i:=0; i<len(target); i:=i+1){
         println target[i]
