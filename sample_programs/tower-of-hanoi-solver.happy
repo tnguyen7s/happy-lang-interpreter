@@ -27,10 +27,10 @@ move(NUMBER n, NUMBER |_| source, NUMBER |_| target, NUMBER|_| aux){
 	{
         move(n-1, source, aux, target)
         
-		NUMBER last
-		last := source.pop()
+		NUMBER last:= source.pop()
         target.push(last)
         
         move(n-1, aux, target, source)
     }    
 }
+

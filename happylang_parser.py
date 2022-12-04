@@ -25,6 +25,7 @@ class ParseType(Enum):
     SUB = auto()
     MUL = auto()
     DIV = auto()
+    MOD = auto()
     POW = auto()
     NEG = auto()
     LEN = auto()
@@ -52,6 +53,7 @@ class ParseType(Enum):
     FUN = auto()
     PARAM = auto()
     MAIN = auto()
+    RETURN = auto()
 
     
 ariness = {
@@ -59,6 +61,7 @@ ariness = {
             ParseType.SUB: 2,
             ParseType.MUL: 2,
             ParseType.DIV: 2,
+            ParseType.MOD: 2,
             ParseType.AND: 2,
             ParseType.OR: 2
           }
@@ -454,7 +457,7 @@ class HappyParser:
         
         while not self.__has(Token.RCURLY):
             if self.__has(Token.NUMBER_TP) or self.__has(Token.STRING_TP):
-                trees.append(self.__var_decl())
+                trees.extend(self.__var_decl())
             else:
                 trees.append(self.__stmt())
         
@@ -467,18 +470,27 @@ class HappyParser:
         
         Returns
         -------
-        ParseTree(ParseType.VAR) 
+        ParseTree [] (ParseType.VAR or ASSIGN) 
         """
-        tree = None
+        trees = []
         if self.__has(Token.NUMBER_TP) or self.__has(Token.STRING_TP):
             child = ParseTree(ParseType.ATOMIC, self.__lexer.get_tok())
             
             self.__next()
-            tree = self.__var_decl2()
-            tree.children_append_left(child)
+            tree1 = self.__var_decl2()
+            tree1.children_append_left(child)
+            trees.append(tree1)
+            
+            if self.__has(Token.ASSIGN):
+                tree2 = ParseTree(ParseType.ASSIGN, self.__lexer.get_tok())
+                
+                self.__next()
+                tree2.children_extend_right([tree1.children[1], self.__expr()])
+                
+                trees.append(tree2)
             
             
-        return tree
+        return trees
             
     def __var_decl2(self):
         """
@@ -550,9 +562,18 @@ class HappyParser:
             return self.__println()
         elif self.__has(Token.INPUT):
             return self.__input()
+        elif self.__has(Token.RETURN):
+            return self.__return()
         else:
             return self.__expr()
+    
+    def __return(self):
+        tree = ParseTree(ParseType.RETURN, self.__lexer.get_tok())
         
+        self.__next()
+        tree.children_append_right(self.__expr())
+        
+        return tree 
         
     def __id_stmt(self):
         """
@@ -938,8 +959,14 @@ class HappyParser:
         """
         tree = None
         
-        if self.__has(Token.TIMES) or self.__has(Token.DIVISION):
-            parse_type = ParseType.MUL if self.__has(Token.TIMES) else ParseType.DIV
+        if self.__has(Token.TIMES) or self.__has(Token.DIVISION) or self.__has(Token.MOD):
+            if self.__has(Token.TIMES):
+                parse_type = ParseType.MUL     
+            elif self.__has(Token.DIVISION):
+                parse_type = ParseType.DIV
+            else:
+                parse_type = ParseType.MOD
+                
             tree = ParseTree(parse_type, self.__lexer.get_tok())
             
             self.__next()

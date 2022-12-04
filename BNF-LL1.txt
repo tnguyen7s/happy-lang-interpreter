@@ -47,11 +47,13 @@ Created on Sun Nov 13 13:17:56 2022
             		| <print>
             		| <println>
             		| <read>
+            		| <return>
             		
 <id-stmt>        ::=  ASSIGN <expr>
             		| SWAP <ref>
             		| <factor'> <term'> <expr'>
             		| DOT <stack-op>
+            		
             		 
 <stack-op> 	     ::= PUSH LPAREN <expr> RPAREN
                     | POP LPAREN RPAREN
@@ -82,6 +84,8 @@ Created on Sun Nov 13 13:17:56 2022
         		    |""
 <assign-list'>   ::= COMMA <assign> <assign-list'> 
                     | ""
+                    
+<return>         ::= "return" <expr>
 
 <expr> 		    ::= <term> <expr'>
 <expr'>         ::= PLUS <term> <expr'>
@@ -203,6 +207,7 @@ MINUS           -
 TIMES           *
 DIVISION        /
 POWER           **
+MOD             %
 
 
 IDENTIFIER      ([a-zA-Z]|_)[a-zA-Z0-9_]*

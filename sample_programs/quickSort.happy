@@ -11,10 +11,8 @@ main ()
        	input array[i] 
     }
     
-	NUMBER low 
-	NUMBER high
-	low := 0
-	high := n - 1
+	NUMBER low := 0
+	NUMBER high := n - 1
     quickSort(array, low, high)
     
 	println "Sorted: "

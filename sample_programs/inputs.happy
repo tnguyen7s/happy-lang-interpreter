@@ -1,0 +1,37 @@
+main(){
+	STRING name:= input_name()
+	
+	NUMBER age := input_age()
+	
+	STRING[3] edu
+	input_edu_info(edu)
+	
+	println ""
+	println "Hi, ", name
+	println "Your age: ", age
+	
+	println "Your education information:"
+	NUMBER i
+	for (i:=0; i<len(edu); i:=i+1){
+		print edu[i], "|"
+	}
+}
+
+input_name(){
+	STRING name
+	input "Please enter your name?"; name
+	
+	return name
+}
+
+input_age(){
+	NUMBER age
+	input "Please enter your age?"; age
+	
+	return age
+}
+
+input_edu_info(STRING[] edu){
+	input "Enter 3 facts about your education: "; edu[0], edu[1], edu[2]
+}
+

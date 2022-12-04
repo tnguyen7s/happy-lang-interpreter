@@ -1,0 +1,22 @@
+main(){
+	NUMBER [10] array
+	
+	NUMBER i
+	for (i:=0; i<10; i:=i+1){
+		input "Next number: "; array[i]
+	}
+	
+	squareList(array)
+	
+	println "The squares of your list: "
+	for (i:=0; i<10; i:=i+1){
+		print array[i], " "
+	}
+}
+
+squareList(NUMBER[] array){
+	NUMBER i
+	for (i:=0; i<len(array); i:=i+1){
+		array[i] := array[i]**2
+	}
+}

@@ -90,6 +90,7 @@ class Token(Enum):
     MINUS = auto()
     TIMES = auto()
     DIVISION = auto()
+    MOD = auto()
     POWER = auto()
 
 
@@ -99,6 +100,8 @@ class Token(Enum):
     
     INVALID = auto()
     EOF = auto()
+    
+    RETURN = auto()
     
     
 TokenDetail = namedtuple('TokenDetail', ['token', 'lexeme', 'value', 'line', 'col'])
@@ -212,7 +215,8 @@ class HappyLexer:
                    '=': Token.EQ, 
                    '+': Token.PLUS, 
                    '-': Token.MINUS,
-                   '/': Token.DIVISION}
+                   '/': Token.DIVISION, 
+                   '%': Token.MOD}
         
         if self.__cur_char in singles:
             self.__token_detail = self.__create_tok(singles[self.__cur_char])
@@ -358,7 +362,8 @@ class HappyLexer:
               'println': Token.PRINTLN,
               'input': Token.INPUT,
               'NUMBER': Token.NUMBER_TP,
-              'STRING': Token.STRING_TP}
+              'STRING': Token.STRING_TP, 
+              'return': Token.RETURN}
         
         line = self.__line
         col = self.__col

@@ -1,0 +1,15 @@
+main(){
+	NUMBER n
+	input "Enter a number"; n
+	
+	if n%2=0 && n>=10 && n<=100
+	{
+		println "The number is even and between 10 and 100."
+	}
+		
+	if n%2=0 && (n<10 || n>100){
+		println "The number is even and less than 10 or greater than 100."
+	}
+}
+
+

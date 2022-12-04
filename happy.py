@@ -39,6 +39,8 @@ class RefEnv:
 
         if parent:
             self.table = ChainMap(self.table, parent.table)
+            
+        self.return_val = None
 
     def lookup(self, ref_name):
         """
@@ -99,6 +101,8 @@ def eval_parse_tree(t, env):
         return eval_MUL(t, env)
     elif t.parse_type == ParseType.DIV:
         return eval_DIV(t, env)
+    elif t.parse_type == ParseType.MOD:
+        return eval_MOD(t, env)
     elif t.parse_type == ParseType.POW:
         return eval_POW(t, env)
     elif t.parse_type == ParseType.NEG:
@@ -145,6 +149,8 @@ def eval_parse_tree(t, env):
         return eval_PRINTLN(t, env)
     elif t.parse_type == ParseType.INPUT:
         return eval_INPUT(t, env)
+    elif t.parse_type == ParseType.RETURN:
+        return eval_RETURN(t, env)
 
 
 def eval_PROGRAM(t, env):
@@ -244,7 +250,11 @@ def eval_CALL(t, env):
 
     # eval the fun's block
     eval_parse_tree(fun_tree.children[-1], called_fun_env)
+    
+    return called_fun_env.return_val
 
+def eval_RETURN(t, env):
+    env.return_val = eval_parse_tree(t.children[0], env)
 
 def eval_BLOCK(t, env):
     """
@@ -331,19 +341,30 @@ def eval_INPUT(t, env):
 
 def eval_INDEXING(t, env):
     a = eval_parse_tree(t.children[0], env)
-        
+    
+    """    
     if type(a)!=Ref or a.ref_type not in [RefType.ARRAY, RefType.STACK]:
         print(f"Indexing only applies to ARRAY or STACK, on line {t.token_detail.line}")
         sys.exit(-1)
-        
-    seq = a.val
+    """
+    if type(a)==Ref and a.ref_type in [RefType.ARRAY, RefType.STACK]:
+        seq = a.val
     
-    index = int(eval_parse_tree(t.children[1], env))
-    if index>=len(seq):
-        print(f"Index out of range on line {t.token_detail.line}")
-        sys.exit(-1)
+        index = int(eval_parse_tree(t.children[1], env))
+        if index>=len(seq):
+            print(f"Index out of range on line {t.token_detail.line}")
+            sys.exit(-1)
         
-    return seq[index]
+        return seq[index]
+    
+    if type(a)==str:
+        index = int(eval_parse_tree(t.children[1], env))
+
+        return a[index]
+    
+    print(f"Indexing only applies to ARRAY or STACK or STRING, on line {t.token_detail.line}")
+    sys.exit(-1)
+    
 
 def eval_PUSH(t, env):
     var_ref = eval_VAR_REF(t.children[0], env)
@@ -484,6 +505,10 @@ def eval_VAR_REF(t, env):
 def eval_ADD(t, env):
     left = eval_parse_tree(t.children[0], env)
     right = eval_parse_tree(t.children[1], env)
+    
+    if type(left)==str or type(right)==str:
+        left = str(left)
+        right = str(right)
 
     return left + right
 
@@ -511,6 +536,16 @@ def eval_DIV(t, env):
         sys.exit(-1)
 
     return left/right
+
+def eval_MOD(t, env):
+    left = eval_parse_tree(t.children[0], env)
+    right = eval_parse_tree(t.children[1], env)
+
+    if right == 0:
+        print(f"Division by 0 on line {t.token_detail.line}")
+        sys.exit(-1)
+
+    return left%right
 
 
 def eval_POW(t, env):
@@ -654,12 +689,16 @@ def eval_LOOP(t, env):
 def eval_LEN(t, env):
     v = eval_parse_tree(t.children[0], env)
         
-    if type(v)!=Ref or v.ref_type not in [RefType.ARRAY, RefType.STACK]:
-        print(f"len() expects argument of type ARRAY or STACK on line {t.token_detail.line}")
-        sys.exit(-1)
+    if type(v)==Ref and v.ref_type in [RefType.ARRAY, RefType.STACK]:
+        return len(v.val)  
+
+    if type(v)==str:
+        return len(v)
+        
+    print(f"len() expects argument of type ARRAY or STACK or STRING on line {t.token_detail.line}")
+    sys.exit(-1)
     
     
-    return len(v.val)  
 
   
 if __name__ == "__main__":
