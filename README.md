@@ -2,4 +2,4 @@
 
 To run the sample programs written in happy:
 
-python3 happy.py filename.happyy
+python3 happy.py filename.happy
